@@ -27,8 +27,8 @@ namespace read_notification
             ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = "c:\\Users\\keich\\AppData\\Local\\Programs\\VOICEVOX\\vv-engine\\run.exe",
-                //CreateNoWindow = true,
-                UseShellExecute = true,
+                CreateNoWindow = true,
+                UseShellExecute = false,
             };
             Process? engine = Process.Start(psi);
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
