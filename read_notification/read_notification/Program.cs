@@ -24,16 +24,17 @@ namespace read_notification
             NotifyIcon notifyIcon = new NotifyIcon();
             notifyIcon.Icon = SystemIcons.Application;
             notifyIcon.Visible = true;
-            ProcessStartInfo psi = new ProcessStartInfo 
+            ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = "c:\\Users\\keich\\AppData\\Local\\Programs\\VOICEVOX\\vv-engine\\run.exe",
-                CreateNoWindow = true,
-                UseShellExecute = false,
+                //CreateNoWindow = true,
+                UseShellExecute = true,
             };
             Process? engine = Process.Start(psi);
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
             {
-                engine?.Kill();
+                Debug.WriteLine("Application is exiting...");
+                engine?.Kill(entireProcessTree: true);
                 engine?.Dispose();
             };
             await ListenNotifications();
@@ -43,7 +44,7 @@ namespace read_notification
         {
             WinRT.ComWrappersSupport.InitializeComWrappers();
             var listener = UserNotificationListener.Current;
-                        try
+            try
             {
                 UserNotificationListenerAccessStatus accessStatus = await listener.RequestAccessAsync();
                 if (accessStatus == UserNotificationListenerAccessStatus.Allowed)
@@ -54,33 +55,50 @@ namespace read_notification
                         {
                             uint notificationId = args.UserNotificationId;
                             List<string> notificationTexts = listener.GetNotification(notificationId).Notification.Visual.Bindings[0].GetTextElements().Select(te => te.Text).ToList();
-                            foreach (string text in notificationTexts)
+                            List<string> texts = notificationTexts.Select((te) => { 
+                                if(te.Length <= 100) return te;
+                                return te.Substring(0, 100) + "以下略"; 
+                            }).ToList();
+                            foreach (string text in texts)
                             {
                                 Debug.WriteLine($" - {text}");
                             }
-                            Stream audio = await GetAudio(notificationTexts);
+                            Stream audio = await GetAudio(texts);
                             PlayAudio(audio);
                         }
 
                     };
                 }
-            }catch(Exception ex)
+            } catch (Exception ex)
             {
                 Debug.WriteLine($"Error: {ex.Message}");
             }
         }
         static async Task<Stream> GetAudio(List<String> texts)
         {
-            //var query = await client.GetFromJsonAsync<JsonElement>("http://localhost:50021/audio_query?text=" + string.Join("%20", texts)+"+speaker=3");
-            var query = await client.PostAsync("http://localhost:50021/audio_query?speaker=3&text=" + string.Join("%20", texts),new StringContent(string.Empty));
-            var responce = await client.PostAsync("http://localhost:50021/synthesis?speaker=1",new StringContent(query.Content.ReadAsStringAsync().Result,Encoding.UTF8,"application/json"));
-            Stream audio = await responce.Content.ReadAsStreamAsync();
-            return audio;
+            try
+            {
+                var query = await client.PostAsync("http://localhost:50021/audio_query?speaker=3&text=" + string.Join("%20", texts), new StringContent(string.Empty));
+                string queryJson = await query.Content.ReadAsStringAsync();
+                var responce = await client.PostAsync("http://localhost:50021/synthesis?speaker=3", new StringContent(queryJson, Encoding.UTF8, "application/json"));
+                Stream audio = await responce.Content.ReadAsStreamAsync();
+                return audio;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"1 Error: {ex.Message}");
+                return Stream.Null;
+            }
         }
         static void PlayAudio(Stream audio)
         {
+            if (audio == Stream.Null)
+            {
+                Debug.WriteLine("Audio stream is null. Cannot play audio.");
+                return;
+            }
             player = new SoundPlayer(audio);
             player.Play();
         }
-}
+    }
 }
