@@ -22,8 +22,15 @@ namespace read_notification
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
             NotifyIcon notifyIcon = new NotifyIcon();
+            var menuStrip = new ContextMenuStrip();
+            var cregitStripItem = new ToolStripLabel("VOICEVOX:ずんだもん");
+            var exitStripItem = new ToolStripMenuItem("Exit");
+            exitStripItem.Click += (s, e) => { Application.Exit(); };
+            menuStrip.Items.Add(cregitStripItem);
+            menuStrip.Items.Add(exitStripItem);
             notifyIcon.Icon = SystemIcons.Application;
             notifyIcon.Visible = true;
+            notifyIcon.ContextMenuStrip = menuStrip;
             ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = "c:\\Users\\keich\\AppData\\Local\\Programs\\VOICEVOX\\vv-engine\\run.exe",
