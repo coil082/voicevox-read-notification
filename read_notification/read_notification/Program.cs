@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Media;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
 using Windows.Media.Playback;
+using Windows.Storage.Provider;
 using Windows.UI.Notifications.Management;
 
 namespace read_notification
@@ -20,20 +22,28 @@ namespace read_notification
         {
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
-            ApplicationConfiguration.Initialize();
-            NotifyIcon notifyIcon = new NotifyIcon();
-            var menuStrip = new ContextMenuStrip();
-            var cregitStripItem = new ToolStripLabel("VOICEVOX:ずんだもん");
-            var exitStripItem = new ToolStripMenuItem("Exit");
-            exitStripItem.Click += (s, e) => { Application.Exit(); };
-            menuStrip.Items.Add(cregitStripItem);
-            menuStrip.Items.Add(exitStripItem);
-            notifyIcon.Icon = SystemIcons.Application;
-            notifyIcon.Visible = true;
-            notifyIcon.ContextMenuStrip = menuStrip;
+            string localFolder = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
+            string configFilePath = System.IO.Path.Combine(localFolder, "config.json");
+            if(!File.Exists(configFilePath))
+            {
+                MessageBox.Show(localFolder+"にconfig.jsonが見つかりません。アプリケーションを終了します。", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://github.com/coil082/voicevox-read-notification",
+                    UseShellExecute = true
+                });
+                Application.Exit();
+                return;
+            }
+            string jsonText = File.ReadAllText(configFilePath);
+            
+
+            JsonDocument jsonData = JsonDocument.Parse(jsonText);
+            string voicevoxPath = jsonData.RootElement.GetProperty("voicevox_engine_Path").GetString();
+
             ProcessStartInfo psi = new ProcessStartInfo
             {
-                FileName = "c:\\Users\\keich\\AppData\\Local\\Programs\\VOICEVOX\\vv-engine\\run.exe",
+                FileName = voicevoxPath,
                 CreateNoWindow = true,
                 UseShellExecute = false,
             };
@@ -44,7 +54,21 @@ namespace read_notification
                 engine?.Kill(entireProcessTree: true);
                 engine?.Dispose();
             };
+
             await ListenNotifications();
+
+            ApplicationConfiguration.Initialize();
+            NotifyIcon notifyIcon = new NotifyIcon();
+            var menuStrip = new ContextMenuStrip();
+            var cregitStripItem = new ToolStripLabel("本ソフトウェアは VOICEVOX を利用しています。");
+            var exitStripItem = new ToolStripMenuItem("Exit");
+            exitStripItem.Click += (s, e) => { Application.Exit(); };
+            menuStrip.Items.Add(cregitStripItem);
+            menuStrip.Items.Add(exitStripItem);
+            notifyIcon.Icon = SystemIcons.Application;
+            notifyIcon.Visible = true;
+            notifyIcon.ContextMenuStrip = menuStrip;
+
             Application.Run();
         }
         static async Task ListenNotifications()
@@ -66,11 +90,9 @@ namespace read_notification
                                 if(te.Length <= 100) return te;
                                 return te.Substring(0, 100) + "以下略"; 
                             }).ToList();
-                            foreach (string text in texts)
-                            {
-                                Debug.WriteLine($" - {text}");
-                            }
+
                             Stream audio = await GetAudio(texts);
+
                             PlayAudio(audio);
                         }
 
